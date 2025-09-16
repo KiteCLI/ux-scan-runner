@@ -1,0 +1,101 @@
+name: UX Scan (Public Runner)
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'URL to scan'
+        required: true
+        type: string
+      scanType:
+        description: 'Type of scan to perform'
+        required: false
+        default: 'full'
+        type: string
+      scanId:
+        description: 'Unique scan ID'
+        required: true
+        type: string
+  repository_dispatch:
+    types: [run-ux-scan]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  ux-scan:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 5
+    
+    steps:
+    - name: Checkout private repository
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.event.client_payload.privateRepo || 'your-org/your-private-repo' }}
+        token: ${{ secrets.PRIVATE_REPO_PAT }}
+        fetch-depth: 1
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Install Playwright browsers
+      run: npx playwright install chromium
+      
+    - name: Run UX scan
+      run: |
+        # Get inputs from either workflow_dispatch or repository_dispatch
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          URL="${{ github.event.inputs.url }}"
+          SCAN_TYPE="${{ github.event.inputs.scanType }}"
+          SCAN_ID="${{ github.event.inputs.scanId }}"
+        else
+          URL="${{ github.event.client_payload.url }}"
+          SCAN_TYPE="${{ github.event.client_payload.scanType }}"
+          SCAN_ID="${{ github.event.client_payload.scanId }}"
+        fi
+        
+        echo "Starting UX scan for URL: $URL"
+        echo "Scan type: $SCAN_TYPE"
+        echo "Scan ID: $SCAN_ID"
+        
+        # Run the Playwright scan
+        npm run scan:playwright -- \
+          --url="$URL" \
+          --scan-type="$SCAN_TYPE" \
+          --scan-id="$SCAN_ID"
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        
+    - name: Upload scan results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: scan-results-${{ github.event.inputs.scanId || github.event.client_payload.scanId }}
+        path: |
+          scan-results-*.json
+          screenshots/
+        retention-days: 7
+        
+    - name: Notify completion
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          SCAN_ID="${{ github.event.inputs.scanId }}"
+          URL="${{ github.event.inputs.url }}"
+        else
+          SCAN_ID="${{ github.event.client_payload.scanId }}"
+          URL="${{ github.event.client_payload.url }}"
+        fi
+        
+        echo "UX scan completed for $URL"
+        echo "Scan ID: $SCAN_ID"
+        echo "Results uploaded as artifact"
