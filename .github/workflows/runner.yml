@@ -20,6 +20,16 @@ on:
         description: 'owner/repo of the private repository to scan (e.g. your-org/your-private-repo)'
         required: true
         type: string
+      userQuery:
+        description: 'User query for the scan'
+        required: false
+        default: 'Comprehensive UX analysis'
+        type: string
+      enableAI:
+        description: 'Whether AI analysis is enabled for this user'
+        required: false
+        default: 'true'
+        type: string
   repository_dispatch:
     types: [run-ux-scan]
 
@@ -44,7 +54,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
         cache: 'npm'
 
     - name: Install dependencies
@@ -53,11 +63,36 @@ jobs:
     - name: Install Playwright browsers
       run: npx playwright install chromium
 
+    - name: Validate AI access
+      run: |
+        # Get inputs from either workflow_dispatch or repository_dispatch
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          ENABLE_AI="${{ github.event.inputs.enableAI }}"
+          USER_QUERY="${{ github.event.inputs.userQuery }}"
+        else
+          ENABLE_AI="${{ github.event.client_payload.enableAI }}"
+          USER_QUERY="${{ github.event.client_payload.userQuery }}"
+        fi
+
+        # Validate AI access
+        if [ "$ENABLE_AI" = "false" ] || [ "$ENABLE_AI" = "0" ]; then
+          echo "AI analysis disabled for this user"
+          echo "DISABLE_AI=true" >> $GITHUB_ENV
+        else
+          echo "AI analysis enabled for this user"
+          echo "DISABLE_AI=false" >> $GITHUB_ENV
+        fi
+
+        # Set user query
+        echo "USER_QUERY=$USER_QUERY" >> $GITHUB_ENV
+
     - name: Run UX scan
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        DISABLE_AI: ${{ env.DISABLE_AI }}
+        USER_QUERY: ${{ env.USER_QUERY }}
       run: |
         # Get inputs from either workflow_dispatch or repository_dispatch
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -73,11 +108,16 @@ jobs:
         echo "Starting UX scan for URL: $URL"
         echo "Scan type: $SCAN_TYPE"
         echo "Scan ID: $SCAN_ID"
+        echo "User query: $USER_QUERY"
+        echo "AI enabled: $([ "$DISABLE_AI" = "true" ] && echo "No" || echo "Yes")"
 
-        npm run scan:playwright -- \
+        # Run the Enhanced UX scan script with proper parameters
+        tsx scripts/enhanced-scan-runner.ts \
           --url="$URL" \
           --scan-type="$SCAN_TYPE" \
-          --scan-id="$SCAN_ID"
+          --scan-id="$SCAN_ID" \
+          --user-query="$USER_QUERY" \
+          --disable-ai="$DISABLE_AI"
 
     - name: Upload scan results
       if: always()
@@ -102,3 +142,4 @@ jobs:
         echo "UX scan completed for $URL"
         echo "Scan ID: $SCAN_ID"
         echo "Results uploaded as artifact"
+        echo "AI analysis: $([ "$DISABLE_AI" = "true" ] && echo "Disabled" || echo "Enabled")"
