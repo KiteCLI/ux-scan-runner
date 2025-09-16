@@ -30,6 +30,10 @@ on:
         required: false
         default: 'true'
         type: string
+      blobToken:  # ← ADD THIS
+        description: 'Vercel Blob Read/Write Token for screenshot storage'
+        required: false
+        type: string
   repository_dispatch:
     types: [run-ux-scan]
 
@@ -93,6 +97,7 @@ jobs:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
         DISABLE_AI: ${{ env.DISABLE_AI }}
         USER_QUERY: ${{ env.USER_QUERY }}
+        BLOB_READ_WRITE_TOKEN: ${{ github.event.inputs.blobToken || github.event.client_payload.blobToken }}  # ← ADD THIS
       run: |
         # Get inputs from either workflow_dispatch or repository_dispatch
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -110,6 +115,7 @@ jobs:
         echo "Scan ID: $SCAN_ID"
         echo "User query: $USER_QUERY"
         echo "AI enabled: $([ "$DISABLE_AI" = "true" ] && echo "No" || echo "Yes")"
+        echo "Blob token available: $([ -n "$BLOB_READ_WRITE_TOKEN" ] && echo "Yes" || echo "No")"  # ← ADD THIS
 
         # Run the Enhanced UX scan script with proper parameters
         npx tsx scripts/enhanced-scan-runner.ts \
