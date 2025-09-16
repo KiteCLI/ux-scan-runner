@@ -112,7 +112,7 @@ jobs:
         echo "AI enabled: $([ "$DISABLE_AI" = "true" ] && echo "No" || echo "Yes")"
 
         # Run the Enhanced UX scan script with proper parameters
-        tsx scripts/enhanced-scan-runner.ts \
+        npx tsx scripts/enhanced-scan-runner.ts \
           --url="$URL" \
           --scan-type="$SCAN_TYPE" \
           --scan-id="$SCAN_ID" \
