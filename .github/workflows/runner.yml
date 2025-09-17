@@ -30,9 +30,21 @@ on:
         required: false
         default: 'true'
         type: string
-      blobToken:  # ← ADD THIS
+      blobToken:
         description: 'Vercel Blob Read/Write Token for screenshot storage'
         required: false
+        type: string
+      # NEW: Business context for next-gen analysis
+      businessContext:
+        description: 'Business context JSON for predictive analysis'
+        required: false
+        default: '{"industry":"Technology","businessType":"SaaS","targetAudience":"Developers","conversionGoals":["signup","trial"],"monthlyRevenue":50000,"monthlyVisitors":10000,"averageOrderValue":100,"currentConversionRate":0.025,"competitivePosition":"challenger"}'
+        type: string
+      # NEW: Enable next-gen features
+      enableNextGen:
+        description: 'Enable next-generation UX analysis features'
+        required: false
+        default: 'true'
         type: string
   repository_dispatch:
     types: [run-ux-scan]
@@ -45,7 +57,7 @@ jobs:
   ux-scan:
     runs-on: ubuntu-latest
     environment: production
-    timeout-minutes: 15
+    timeout-minutes: 20  # Increased for next-gen analysis
 
     steps:
     - name: Checkout private repository
@@ -67,15 +79,19 @@ jobs:
     - name: Install Playwright browsers
       run: npx playwright install chromium
 
-    - name: Validate AI access
+    - name: Validate AI access and next-gen features
       run: |
         # Get inputs from either workflow_dispatch or repository_dispatch
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           ENABLE_AI="${{ github.event.inputs.enableAI }}"
           USER_QUERY="${{ github.event.inputs.userQuery }}"
+          ENABLE_NEXT_GEN="${{ github.event.inputs.enableNextGen }}"
+          BUSINESS_CONTEXT="${{ github.event.inputs.businessContext }}"
         else
           ENABLE_AI="${{ github.event.client_payload.enableAI }}"
           USER_QUERY="${{ github.event.client_payload.userQuery }}"
+          ENABLE_NEXT_GEN="${{ github.event.client_payload.enableNextGen }}"
+          BUSINESS_CONTEXT="${{ github.event.client_payload.businessContext }}"
         fi
 
         # Validate AI access
@@ -87,17 +103,40 @@ jobs:
           echo "DISABLE_AI=false" >> $GITHUB_ENV
         fi
 
-        # Set user query
-        echo "USER_QUERY=$USER_QUERY" >> $GITHUB_ENV
+        # Validate next-gen features
+        if [ "$ENABLE_NEXT_GEN" = "false" ] || [ "$ENABLE_NEXT_GEN" = "0" ]; then
+          echo "Next-gen analysis disabled"
+          echo "ENABLE_NEXT_GEN=false" >> $GITHUB_ENV
+        else
+          echo "Next-gen analysis enabled"
+          echo "ENABLE_NEXT_GEN=true" >> $GITHUB_ENV
+        fi
 
-    - name: Run UX scan
+        # Set user query and business context
+        echo "USER_QUERY=$USER_QUERY" >> $GITHUB_ENV
+        echo "BUSINESS_CONTEXT=$BUSINESS_CONTEXT" >> $GITHUB_ENV
+
+    - name: Run Enhanced UX scan with Next-Gen Analysis
       env:
+        # Core AI APIs
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        
+        # Scan configuration
         DISABLE_AI: ${{ env.DISABLE_AI }}
         USER_QUERY: ${{ env.USER_QUERY }}
-        BLOB_READ_WRITE_TOKEN: ${{ github.event.inputs.blobToken || github.event.client_payload.blobToken }}  # ← ADD THIS
+        ENABLE_NEXT_GEN: ${{ env.ENABLE_NEXT_GEN }}
+        BUSINESS_CONTEXT: ${{ env.BUSINESS_CONTEXT }}
+        
+        # File storage
+        BLOB_READ_WRITE_TOKEN: ${{ github.event.inputs.blobToken || github.event.client_payload.blobToken }}
+        
+        # Next-gen analysis features
+        ENABLE_VISION_FIRST: ${{ env.ENABLE_NEXT_GEN }}
+        ENABLE_INTERACTION_ANALYSIS: ${{ env.ENABLE_NEXT_GEN }}
+        ENABLE_PREDICTIVE_INSIGHTS: ${{ env.ENABLE_NEXT_GEN }}
+        ENABLE_COMPETITIVE_INTELLIGENCE: ${{ env.ENABLE_NEXT_GEN }}
       run: |
         # Get inputs from either workflow_dispatch or repository_dispatch
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -110,22 +149,27 @@ jobs:
           SCAN_ID="${{ github.event.client_payload.scanId }}"
         fi
 
-        echo "Starting UX scan for URL: $URL"
+        echo "🚀 Starting Enhanced UX scan with Next-Gen Analysis"
+        echo "URL: $URL"
         echo "Scan type: $SCAN_TYPE"
         echo "Scan ID: $SCAN_ID"
         echo "User query: $USER_QUERY"
         echo "AI enabled: $([ "$DISABLE_AI" = "true" ] && echo "No" || echo "Yes")"
-        echo "Blob token available: $([ -n "$BLOB_READ_WRITE_TOKEN" ] && echo "Yes" || echo "No")"  # ← ADD THIS
+        echo "Next-gen features: $([ "$ENABLE_NEXT_GEN" = "true" ] && echo "Enabled" || echo "Disabled")"
+        echo "Blob token available: $([ -n "$BLOB_READ_WRITE_TOKEN" ] && echo "Yes" || echo "No")"
+        echo "Business context: $BUSINESS_CONTEXT"
 
-        # Run the Enhanced UX scan script with proper parameters
+        # Run the Enhanced UX scan script with next-gen parameters
         npx tsx scripts/enhanced-scan-runner.ts \
           --url="$URL" \
           --scan-type="$SCAN_TYPE" \
           --scan-id="$SCAN_ID" \
           --user-query="$USER_QUERY" \
-          --disable-ai="$DISABLE_AI"
+          --disable-ai="$DISABLE_AI" \
+          --enable-next-gen="$ENABLE_NEXT_GEN" \
+          --business-context="$BUSINESS_CONTEXT"
 
-    - name: Upload scan results
+    - name: Upload scan results and next-gen insights
       if: always()
       uses: actions/upload-artifact@v4
       with:
@@ -133,9 +177,11 @@ jobs:
         path: |
           scan-results-*.json
           screenshots/
+          next-gen-insights-*.json
+          predictive-analysis-*.json
         retention-days: 7
 
-    - name: Notify completion
+    - name: Notify completion with next-gen insights
       run: |
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           SCAN_ID="${{ github.event.inputs.scanId }}"
@@ -145,7 +191,9 @@ jobs:
           URL="${{ github.event.client_payload.url }}"
         fi
 
-        echo "UX scan completed for $URL"
+        echo "🎉 Enhanced UX scan completed for $URL"
         echo "Scan ID: $SCAN_ID"
         echo "Results uploaded as artifact"
         echo "AI analysis: $([ "$DISABLE_AI" = "true" ] && echo "Disabled" || echo "Enabled")"
+        echo "Next-gen features: $([ "$ENABLE_NEXT_GEN" = "true" ] && echo "Enabled" || echo "Disabled")"
+        echo "Predictive insights: $([ "$ENABLE_NEXT_GEN" = "true" ] && echo "Generated" || echo "Not available")"
