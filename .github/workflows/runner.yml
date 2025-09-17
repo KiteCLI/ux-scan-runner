@@ -38,7 +38,6 @@ on:
       businessContext:
         description: 'Business context JSON for predictive analysis'
         required: false
-        default: '{"industry":"Technology","businessType":"SaaS","targetAudience":"Developers","conversionGoals":["signup","trial"],"monthlyRevenue":50000,"monthlyVisitors":10000,"averageOrderValue":100,"currentConversionRate":0.025,"competitivePosition":"challenger"}'
         type: string
       # NEW: Enable next-gen features
       enableNextGen:
@@ -112,8 +111,14 @@ jobs:
           echo "ENABLE_NEXT_GEN=true" >> $GITHUB_ENV
         fi
 
-        # Set user query and business context
+        # Set user query and business context with fallback
         echo "USER_QUERY=$USER_QUERY" >> $GITHUB_ENV
+        
+        # Handle business context - use default if empty or not provided
+        if [ -z "$BUSINESS_CONTEXT" ] || [ "$BUSINESS_CONTEXT" = "" ]; then
+          echo "Using default business context"
+          BUSINESS_CONTEXT='{"industry":"Technology","businessType":"SaaS","targetAudience":"Developers and Designers","conversionGoals":["signup","trial","demo"],"monthlyRevenue":50000,"monthlyVisitors":10000,"averageOrderValue":100,"currentConversionRate":0.025,"competitivePosition":"challenger"}'
+        fi
         echo "BUSINESS_CONTEXT=$BUSINESS_CONTEXT" >> $GITHUB_ENV
 
     - name: Run Enhanced UX scan with Next-Gen Analysis
