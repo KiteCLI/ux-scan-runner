@@ -164,6 +164,9 @@ jobs:
         echo "Blob token available: $([ -n "$BLOB_READ_WRITE_TOKEN" ] && echo "Yes" || echo "No")"
         echo "Business context: $BUSINESS_CONTEXT"
 
+        # Create a temporary file to store the business context to avoid shell escaping issues
+        echo "$BUSINESS_CONTEXT" > /tmp/business_context.json
+
         # Run the Enhanced UX scan script with next-gen parameters
         npx tsx scripts/enhanced-scan-runner.ts \
           --url="$URL" \
@@ -172,7 +175,7 @@ jobs:
           --user-query="$USER_QUERY" \
           --disable-ai="$DISABLE_AI" \
           --enable-next-gen="$ENABLE_NEXT_GEN" \
-          --business-context="$BUSINESS_CONTEXT"
+          --business-context="$(cat /tmp/business_context.json)"
 
     - name: Upload scan results and next-gen insights
       if: always()
